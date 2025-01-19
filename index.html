@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen and Microphone Recorder</title>
+</head>
+<body>
+    <h1>ScrRec</h1>
+    <button id="start">Start Recording</button>
+    <button id="stop" disabled>Stop Recording</button>
+    <video id="preview" controls autoplay style="display: none;"></video>
+
+    <script>
+        const startButton = document.getElementById('start');
+        const stopButton = document.getElementById('stop');
+        const preview = document.getElementById('preview');
+
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        startButton.addEventListener('click', async () => {
+            try {
+                if (startButton.textContent === "Record Again") {
+                    location.reload();
+                    return;
+                }
+
+                // Clear previous recording
+                recordedChunks = [];
+                preview.srcObject = null;
+                preview.src = '';
+                const existingDownloadLink = document.querySelector('a[download]');
+                if (existingDownloadLink) {
+                    existingDownloadLink.remove();
+                }
+
+                // Capture screen and audio
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // Combine screen and audio streams
+                const combinedStream = new MediaStream([
+                    ...screenStream.getVideoTracks(),
+                    ...audioStream.getAudioTracks()
+                ]);
+
+                // Initialize media recorder
+                mediaRecorder = new MediaRecorder(combinedStream);
+
+                // Collect recorded chunks
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                // Handle stop event
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+
+                    // Show preview and download link
+                    preview.srcObject = null;
+                    preview.src = url;
+                    preview.controls = true;
+                    preview.style.display = "block";
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'recording.webm';
+                    a.textContent = 'Download Recording';
+                    document.body.appendChild(a);
+                };
+
+                // Start recording
+                mediaRecorder.start();
+                startButton.textContent = "Record Again";
+                stopButton.disabled = false;
+                startButton.style.display = "none";
+            } catch (err) {
+                console.error('Error starting recording:', err);
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            // Stop recording
+            mediaRecorder.stop();
+            stopButton.disabled = true;
+            startButton.style.display = "inline-block";
+        });
+    </script>
+</body>
+</html>
