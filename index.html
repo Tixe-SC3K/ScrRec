@@ -4,47 +4,132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ScrRec</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #start {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #stop {
+            background-color: #f44336;
+            color: white;
+        }
+
+        button:hover:not(:disabled) {
+            transform: scale(1.05);
+        }
+
+        label {
+            display: block;
+            margin: 20px 0;
+        }
+
+        video {
+            margin: 20px auto;
+            display: none;
+            max-width: 90%;
+            border: 2px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        video.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        a {
+            display: block;
+            margin: 10px auto;
+            text-decoration: none;
+            color: #007BFF;
+            font-weight: bold;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <h1>ScrRec</h1>
-    <p>Note: everything happens locally, your videos never leave your device<br>You should not record videos that are too long because they may fail to save</p>
-    <button id="start">Start Recording</button>
-    <button id="stop" disabled>Stop Recording</button>
-    <video id="preview" controls autoplay style="display: none;"></video>
+    <p>Note: Everything happens locally, your video never leaves your device.<br>You shouldn't record videos that are too long or else they might not save.</p>
+    <label>
+        <input type="checkbox" id="toggleMic" checked>
+        Use microphone
+    </label>
+    <button id="start">Start recording</button>
+    <button id="stop" disabled>Stop recording</button>
+    <a id="downloadLink" style="display: none;">Download Recording</a>
+    <video id="preview" controls autoplay></video>
 
     <script>
         const startButton = document.getElementById('start');
         const stopButton = document.getElementById('stop');
         const preview = document.getElementById('preview');
+        const toggleMic = document.getElementById('toggleMic');
+        const downloadLink = document.getElementById('downloadLink');
 
         let mediaRecorder;
         let recordedChunks = [];
 
+        // Check microphone availability
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+            const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+            toggleMic.disabled = !hasMicrophone;
+            toggleMic.checked = hasMicrophone;
+        });
+
         startButton.addEventListener('click', async () => {
             try {
-                if (startButton.textContent === "Record Again") {
+                if (startButton.textContent === "Record again") {
                     location.reload();
                     return;
                 }
 
-                // Clear previous recording
-                recordedChunks = [];
-                preview.srcObject = null;
-                preview.src = '';
-                const existingDownloadLink = document.querySelector('a[download]');
-                if (existingDownloadLink) {
-                    existingDownloadLink.remove();
-                }
-
-                // Capture screen and audio
+                // Capture screen and optionally audio
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                let combinedStream = new MediaStream(screenStream.getVideoTracks());
 
-                // Combine screen and audio streams
-                const combinedStream = new MediaStream([
-                    ...screenStream.getVideoTracks(),
-                    ...audioStream.getAudioTracks()
-                ]);
+                if (toggleMic.checked) {
+                    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    combinedStream.addTrack(audioStream.getAudioTracks()[0]);
+                }
 
                 // Initialize media recorder
                 mediaRecorder = new MediaRecorder(combinedStream);
@@ -65,18 +150,16 @@
                     preview.srcObject = null;
                     preview.src = url;
                     preview.controls = true;
-                    preview.style.display = "block";
+                    preview.classList.add("visible");
 
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'recording.webm';
-                    a.textContent = 'Download Recording';
-                    document.body.appendChild(a);
+                    downloadLink.href = url;
+                    downloadLink.download = 'recording.webm';
+                    downloadLink.style.display = 'block';
                 };
 
                 // Start recording
                 mediaRecorder.start();
-                startButton.textContent = "Record Again";
+                startButton.textContent = "Record again";
                 stopButton.disabled = false;
                 startButton.style.display = "none";
             } catch (err) {
@@ -89,6 +172,7 @@
             mediaRecorder.stop();
             stopButton.disabled = true;
             startButton.style.display = "inline-block";
+            startButton.textContent = "Record again";
         });
     </script>
 </body>
